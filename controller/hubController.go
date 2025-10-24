@@ -4,60 +4,61 @@ import (
 	"context"
 	"net/http"
 	"wms/models"
+
 	"github.com/gin-gonic/gin"
 	"github.com/omniful/go_commons/redis"
 	"gorm.io/gorm"
 )
 
-type HubController struct{
-	DB *gorm.DB
-	RC redis.Client
+type HubController struct {
+	DB  *gorm.DB
+	RC  redis.Client
 	Ctx *context.Context
 }
 
-func CreateHubController(db *gorm.DB,rd redis.Client,ctx *context.Context)*HubController{
-	return &HubController{DB:db,RC:rd,Ctx: ctx}
+func CreateHubController(db *gorm.DB, rd redis.Client, ctx *context.Context) *HubController {
+	return &HubController{DB: db, RC: rd, Ctx: ctx}
 }
 
-//getting all hubs
-func (h *HubController) viewHubs(c *gin.Context){
-	var hubs [] models.Hub
-	if results:=h.DB.Find(&hubs); results.Error!=nil{
-		c.JSON(http.StatusBadRequest,gin.H{
-			"message":"Error during fetching hubs data",
-			"error":results.Error.Error(),
+// getting all hubs
+func (h *HubController) ViewHubs(c *gin.Context) {
+	var hubs []models.Hub
+	if results := h.DB.Find(&hubs); results.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "Error during fetching hubs data",
+			"error":   results.Error.Error(),
 		})
-		return 
+		return
 	}
-	c.JSON(200,hubs)
+	c.JSON(200, hubs)
 }
 
-//creating a hub
-func (h *HubController) createHub(c *gin.Context){
-	var hubjson struct{
-		TenantId uint `json:"tenantid" binding:"required"`
-		Name string `json:"name" binding:"required"`
-		Address string `json:"address" binding:"required"`
+// creating a hub
+func (h *HubController) CreateHub(c *gin.Context) {
+	var hubjson struct {
+		TenantId uint   `json:"tenantid" binding:"required"`
+		Name     string `json:"name" binding:"required"`
+		Address  string `json:"address" binding:"required"`
 	}
-	if err:=c.ShouldBindJSON(&hubjson);err!=nil{
-		c.JSON(http.StatusBadRequest,gin.H{
-			"message":"Error during binding body data",
-			"error":err.Error(),
+	if err := c.ShouldBindJSON(&hubjson); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "Error during binding body data",
+			"error":   err.Error(),
 		})
-		return 
+		return
 	}
 	var newhub models.Hub
-	newhub.Address=hubjson.Address
-	newhub.Name=hubjson.Name
-	newhub.TenantId=hubjson.TenantId
-	if results:=h.DB.Save(&newhub);results.Error!=nil{
-		c.JSON(http.StatusBadRequest,gin.H{
-			"message":"Error saving data in database",
-			"error":results.Error.Error(),
+	newhub.Address = hubjson.Address
+	newhub.Name = hubjson.Name
+	newhub.TenantId = hubjson.TenantId
+	if results := h.DB.Save(&newhub); results.Error != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "Error saving data in database",
+			"error":   results.Error.Error(),
 		})
-		return 
+		return
 	}
-	c.JSON(200,gin.H{
-		"message":"new Hub created",
+	c.JSON(200, gin.H{
+		"message": "new Hub created",
 	})
 }

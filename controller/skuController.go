@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"wms/models"
 
@@ -16,12 +17,12 @@ type SkuHandler struct {
 	Ctx *context.Context
 }
 
-func CreatSkuHandler(db *gorm.DB, rd redis.Client, ctx *context.Context) *SkuHandler {
+func CreatSkuController(db *gorm.DB, rd redis.Client, ctx *context.Context) *SkuHandler {
 	return &SkuHandler{DB: db, RC: rd, Ctx: ctx}
 }
 
 // view all skus present
-func (h *SkuHandler) viewSkus(c *gin.Context) {
+func (h *SkuHandler) ViewSkus(c *gin.Context) {
 	var skus []models.Sku
 	if results := h.DB.Find(&skus); results.Error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -34,9 +35,9 @@ func (h *SkuHandler) viewSkus(c *gin.Context) {
 }
 
 // add new skus
-func (h *SkuHandler) createSkus(c *gin.Context) {
+func (h *SkuHandler) CreateSkus(c *gin.Context) {
 	var skujson struct {
-		TenantId uint   `json:"prodid" binding:"required"`
+		TenantId uint   `json:"tenantid" binding:"required"`
 		Name     string `json:"name" binding:"required"`
 		SkuCode  string `json:"skucode" binding:"required"`
 		Desc     string `json:"desc" binding:"required"`
@@ -55,12 +56,12 @@ func (h *SkuHandler) createSkus(c *gin.Context) {
 	newSku.SkuCode = skujson.SkuCode
 	newSku.Desc = skujson.Desc
 	newSku.Price = skujson.Price
-	if err := h.DB.Save(&newSku); err != nil {
+	if err := h.DB.Save(&newSku); err.Error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": "Error saving data in database",
 			"error":   err.Error.Error(),
 		})
-		return 
+		return
 	}
 	c.JSON(200, gin.H{
 		"message": "created new sku",
@@ -68,10 +69,10 @@ func (h *SkuHandler) createSkus(c *gin.Context) {
 }
 
 // verify from orders to check whether all skus present in a hub or not
-func (h *SkuHandler) verifySkus(c *gin.Context) {
+func (h *SkuHandler) VerifySkus(c *gin.Context) {
 	type Order struct {
 		SNo      string `json:"sno"`
-		SellerID string `json:"seller_id"`
+		SellerID uint   `json:"seller_id"`
 		OrderID  string `json:"order_id"`
 		ItemID   string `json:"item_id"`
 		Quantity string `json:"quantity"`
@@ -82,16 +83,34 @@ func (h *SkuHandler) verifySkus(c *gin.Context) {
 		ValidOrders   []Order `json:"valid_orders"`
 		MissingOrders []Order `json:"missing_orders"`
 	}
-	var orders []Order 	
-	if err:=c.ShouldBindJSON(&orders);err!=nil{
+	var orders []Order
+	if err := c.ShouldBindJSON(&orders); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": "Error binding body data",
 			"error":   err.Error(),
 		})
 		return
 	}
-	preloadedDb=h.DB.Model(&models.Tenant{}).Preload("Sellers").Preload("Hubs").Preload("Skus")
-	for _,o:=range(orders){
-		
+	var newOrderResponse OrderResponse
+	preloadedDb := h.DB.Model(&models.Tenant{}).
+    Joins("JOIN sellers ON sellers.tenant_id = tenants.id").
+    Joins("JOIN skus ON skus.tenant_id = tenants.id").
+	Joins("Join hubs ON hubs.tenant_id = tenants.id").
+	Joins("Join inventories ON inventories.hub_id = hubs.id AND inventories.sku_id = skus.id")
+	for _, o := range orders {
+		results := preloadedDb.Where("Sellers.ID = ? and skus.Sku_Code = ?", o.SellerID, o.ItemID)
+		if results.Error != nil {
+			log.Println(results.Error.Error())
+		} else {
+			var cnt int64
+			results.Count(&cnt)
+			if cnt>0{
+			newOrderResponse.ValidOrders = append(newOrderResponse.ValidOrders, o)
+			}else {
+				newOrderResponse.MissingOrders=append(newOrderResponse.MissingOrders, o)
+			}
+		}
+		log.Println(o)
 	}
+	c.JSON(200, newOrderResponse)
 }
