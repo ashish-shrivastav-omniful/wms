@@ -93,10 +93,10 @@ func (h *SkuHandler) VerifySkus(c *gin.Context) {
 	}
 	var newOrderResponse OrderResponse
 	preloadedDb := h.DB.Model(&models.Tenant{}).
-    Joins("JOIN sellers ON sellers.tenant_id = tenants.id").
-    Joins("JOIN skus ON skus.tenant_id = tenants.id").
-	Joins("Join hubs ON hubs.tenant_id = tenants.id").
-	Joins("Join inventories ON inventories.hub_id = hubs.id AND inventories.sku_id = skus.id")
+		Joins("JOIN sellers ON sellers.tenant_id = tenants.id").
+		Joins("JOIN skus ON skus.tenant_id = tenants.id").
+		Joins("Join hubs ON hubs.tenant_id = tenants.id").
+		Joins("Join inventories ON inventories.hub_id = hubs.id AND inventories.sku_id = skus.id")
 	for _, o := range orders {
 		results := preloadedDb.Where("Sellers.ID = ? and skus.Sku_Code = ?", o.SellerID, o.ItemID)
 		if results.Error != nil {
@@ -104,10 +104,10 @@ func (h *SkuHandler) VerifySkus(c *gin.Context) {
 		} else {
 			var cnt int64
 			results.Count(&cnt)
-			if cnt>0{
-			newOrderResponse.ValidOrders = append(newOrderResponse.ValidOrders, o)
-			}else {
-				newOrderResponse.MissingOrders=append(newOrderResponse.MissingOrders, o)
+			if cnt > 0 {
+				newOrderResponse.ValidOrders = append(newOrderResponse.ValidOrders, o)
+			} else {
+				newOrderResponse.MissingOrders = append(newOrderResponse.MissingOrders, o)
 			}
 		}
 		log.Println(o)
