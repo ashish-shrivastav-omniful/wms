@@ -6,18 +6,18 @@ import (
 	"wms/models"
 
 	"github.com/gin-gonic/gin"
-	"github.com/omniful/go_commons/redis"
+	// "github.com/omniful/go_commons/redis"
 	"gorm.io/gorm"
 )
 
 type HubController struct {
 	DB  *gorm.DB
-	RC  redis.Client
+	// RC  redis.Client
 	Ctx *context.Context
 }
 
-func CreateHubController(db *gorm.DB, rd redis.Client, ctx *context.Context) *HubController {
-	return &HubController{DB: db, RC: rd, Ctx: ctx}
+func CreateHubController(db *gorm.DB, ctx *context.Context) *HubController {
+	return &HubController{DB: db, Ctx: ctx}
 }
 
 // getting all hubs

@@ -6,18 +6,18 @@ import (
 	"wms/models"
 
 	"github.com/gin-gonic/gin"
-	"github.com/omniful/go_commons/redis"
+	// "github.com/omniful/go_commons/redis"
 	"gorm.io/gorm"
 )
 
 type TenantHandler struct {
 	DB  *gorm.DB
-	RC  redis.Client
+	// RC  redis.Client
 	Ctx *context.Context
 }
 
-func CreateTenantController(db *gorm.DB, rd redis.Client, ctx *context.Context) *TenantHandler {
-	return &TenantHandler{DB: db, RC: rd, Ctx: ctx}
+func CreateTenantController(db *gorm.DB, ctx *context.Context) *TenantHandler {
+	return &TenantHandler{DB: db, Ctx: ctx}
 }
 
 func (h *TenantHandler) ViewTenants(c *gin.Context) {

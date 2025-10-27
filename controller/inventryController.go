@@ -2,22 +2,24 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"net/http"
+	"strconv"
 	"wms/models"
 
 	"github.com/gin-gonic/gin"
-	"github.com/omniful/go_commons/redis"
+	// "github.com/omniful/go_commons/redis"
 	"gorm.io/gorm"
 )
 
 type InventoryHandler struct {
 	DB  *gorm.DB
-	RC  redis.Client
+	// RC  redis.Client
 	Ctx *context.Context
 }
 
-func CreateInventoryController(db *gorm.DB, rd redis.Client, ctx *context.Context) *InventoryHandler {
-	return &InventoryHandler{DB: db, RC: rd, Ctx: ctx}
+func CreateInventoryController(db *gorm.DB, ctx *context.Context) *InventoryHandler {
+	return &InventoryHandler{DB: db, Ctx: ctx}
 }
 
 // to get inventory details for each sku at each hub
@@ -36,54 +38,74 @@ func (h *InventoryHandler) ViewInventory(c *gin.Context) {
 
 // to change inventory details for a particular sku
 func (h *InventoryHandler) EditInventory(c *gin.Context) {
-	var inventoryjson struct {
+	var input struct {
 		HubId uint `json:"hubid" binding:"required"`
 		SkuId uint `json:"skuid" binding:"required"`
 		Qty   uint `json:"qty" binding:"required"`
 	}
-	if err := c.ShouldBindJSON(&inventoryjson); err != nil {
+
+	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message": "Error binding sku data",
+			"message": "Error binding SKU data",
 			"error":   err.Error(),
 		})
 		return
 	}
-	var editedInventory models.Inventory
-	if err := h.DB.Where("sku_id = ? AND hub_id = ?", inventoryjson.SkuId, inventoryjson.HubId).First(&editedInventory); err.Error != nil {
-		editedInventory.HubId = inventoryjson.HubId
-		editedInventory.SkuId = inventoryjson.SkuId
-		editedInventory.Qty = inventoryjson.Qty
-		if err := h.DB.Save(&editedInventory); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"message": "Could not find inventry and error creating new inventory",
-				"error":   err.Error.Error(),
+
+	var inventory models.Inventory
+	result := h.DB.Where("sku_id = ? AND hub_id = ?", input.SkuId, input.HubId).First(&inventory)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		// Create new inventory if not found
+		inventory = models.Inventory{
+			HubId: input.HubId,
+			SkuId: input.SkuId,
+			Qty:   input.Qty,
+		}
+		if err := h.DB.Create(&inventory).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": "Could not create inventory",
+				"error":   err.Error(),
 			})
 			return
 		}
-		c.JSON(200, gin.H{
-			"message": "Could not find inventory data so created new entry",
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Inventory not found, created new entry",
+			"data":    inventory,
+		})
+		return
+	} else if result.Error != nil {
+		// Any other DB error
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Database error",
+			"error":   result.Error.Error(),
 		})
 		return
 	}
-	editedInventory.Qty = inventoryjson.Qty
-	if err := h.DB.Save(&editedInventory); err.Error != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"message": "Error saving edited data",
-			"error":   err.Error.Error(),
+
+	// Record exists, update quantity
+	inventory.Qty = input.Qty
+	if err := h.DB.Save(&inventory).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Error updating inventory",
+			"error":   err.Error(),
 		})
 		return
 	}
-	c.JSON(200, gin.H{
-		"message": "Edited inventry details",
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Inventory updated successfully",
+		"data":    inventory,
 	})
 }
+
 
 // to update inventory data after sales of particular sku
 func (h *InventoryHandler) UpdateInventoryAftersales(c *gin.Context) {
 	var inventoryjson struct {
-		HubId uint `json:"hubid" binding:"required"`
-		SkuId uint `json:"skuid" binding:"required"`
-		Qty   uint `json:"qty" binding:"required"`
+		OrderId string `json:"order_id"`
+		HubId string `json:"hubid"`
+		SkuId string `json:"item_id" binding:"required"`
+		Qty   string `json:"quantity" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&inventoryjson); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -93,20 +115,22 @@ func (h *InventoryHandler) UpdateInventoryAftersales(c *gin.Context) {
 		return
 	}
 	var editedInventory models.Inventory
-	if err := h.DB.Where("sku_id = ? AND hub_id = ?", inventoryjson.SkuId, inventoryjson.HubId).First(&editedInventory); err.Error != nil {
+	
+	if err := h.DB.Joins("Join skus ON inventories.sku_id = skus.id").Where("sku_code = ? ", inventoryjson.SkuId).First(&editedInventory); err.Error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": "Error finding inventory data",
 			"error":   err.Error.Error(),
 		})
 		return
 	}
-	if editedInventory.Qty < inventoryjson.Qty {
+	q,_:=strconv.ParseUint(inventoryjson.Qty,10,64)
+	if editedInventory.Qty <  uint(q){
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": "Sufficient items are not there in the inventory",
 		})
 		return
 	}
-	editedInventory.Qty -= inventoryjson.Qty
+	editedInventory.Qty -= uint(q)
 	if err := h.DB.Save(&editedInventory); err.Error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": "Error saving edited data",

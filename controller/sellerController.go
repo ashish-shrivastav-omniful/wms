@@ -6,18 +6,18 @@ import (
 	"wms/models"
 
 	"github.com/gin-gonic/gin"
-	"github.com/omniful/go_commons/redis"
+	// "github.com/omniful/go_commons/redis"
 	"gorm.io/gorm"
 )
 
 type SellerHandler struct {
 	DB  *gorm.DB
-	RC  redis.Client
+	// RC  redis.Client
 	Ctx *context.Context
 }
 
-func CreateSellerController(db *gorm.DB, rd redis.Client, ctx *context.Context) *SellerHandler {
-	return &SellerHandler{DB: db, RC: rd, Ctx: ctx}
+func CreateSellerController(db *gorm.DB, ctx *context.Context) *SellerHandler {
+	return &SellerHandler{DB: db, Ctx: ctx}
 }
 
 func (h *SellerHandler) ViewSellers(c *gin.Context) {

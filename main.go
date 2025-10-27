@@ -12,7 +12,7 @@ import (
 func main() {
 	server := http.InitializeServer(":8080", 0, 0, 0, false)
 	utils.InitializePostgresDb(*config.PostgresConfig, &[]postgres.DBConfig{*config.PostgresConfig})
-	utils.InitializeRedis()
+	// utils.InitializeRedis()
 	routes.GetRoutes(server)
 	if err := server.StartServer("wms"); err != nil {
 		panic(err.Error())

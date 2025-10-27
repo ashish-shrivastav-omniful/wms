@@ -2,23 +2,24 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"wms/models"
 
 	"github.com/gin-gonic/gin"
-	"github.com/omniful/go_commons/redis"
+	// "github.com/omniful/go_commons/redis"
 	"gorm.io/gorm"
 )
 
 type SkuHandler struct {
 	DB  *gorm.DB
-	RC  redis.Client
+	// RC  redis.Client
 	Ctx *context.Context
 }
 
-func CreatSkuController(db *gorm.DB, rd redis.Client, ctx *context.Context) *SkuHandler {
-	return &SkuHandler{DB: db, RC: rd, Ctx: ctx}
+func CreatSkuController(db *gorm.DB, ctx *context.Context) *SkuHandler {
+	return &SkuHandler{DB: db, Ctx: ctx}
 }
 
 // view all skus present
@@ -70,9 +71,10 @@ func (h *SkuHandler) CreateSkus(c *gin.Context) {
 
 // verify from orders to check whether all skus present in a hub or not
 func (h *SkuHandler) VerifySkus(c *gin.Context) {
+	fmt.Println(c.Request.Body)
 	type Order struct {
 		SNo      string `json:"sno"`
-		SellerID uint   `json:"seller_id"`
+		SellerID string   `json:"seller_id"`
 		OrderID  string `json:"order_id"`
 		ItemID   string `json:"item_id"`
 		Quantity string `json:"quantity"`
